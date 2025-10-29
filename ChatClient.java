@@ -264,7 +264,7 @@ public class ChatClient extends JFrame {
         boolean mine = userName != null && text.startsWith(userName + ":");
         boolean system = !text.contains(":");
 
-       
+        // ✅ System message centered
         if (system) {
 
             JPanel wrapper = new JPanel();
@@ -297,12 +297,16 @@ public class ChatClient extends JFrame {
         scrollDown();
     }
 
+
     private void scrollDown() {
-        chatContainer.revalidate();
-        chatContainer.repaint();
-        JScrollBar sb = ((JScrollPane) chatContainer.getParent().getParent()).getVerticalScrollBar();
-        sb.setValue(sb.getMaximum());
+        SwingUtilities.invokeLater(() -> {
+            chatContainer.revalidate();
+            chatContainer.repaint();
+            JScrollBar sb = ((JScrollPane) chatContainer.getParent().getParent()).getVerticalScrollBar();
+            sb.setValue(sb.getMaximum());
+        });
     }
+
 
     private void closeConnection() {
         try {
