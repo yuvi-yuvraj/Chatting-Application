@@ -1,3 +1,4 @@
+package neww;
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -78,7 +79,7 @@ public class ChatServer {
                                 userList.add(userName);
                                 dout.writeUTF("Accepted");
                                 userJoined = true;
-                                sendToAll("🟢 " + userName + " joined the chat.");
+                                sendToAll("SYS:" + userName + " joined the chat.");
                                 server.dispatchUserList();
                                 System.out.println("👤 " + userName + " joined.");
                             }
