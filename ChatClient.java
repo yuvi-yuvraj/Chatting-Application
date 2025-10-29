@@ -1,30 +1,39 @@
+package neww;
 import javax.swing.*;
+import com.formdev.flatlaf.extras.FlatAnimatedLafChange;
+import com.formdev.flatlaf.*;
 import javax.swing.border.EmptyBorder;
+
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.net.*;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.List;
+import javax.swing.UIManager;
+import java.awt.Font;
 
 public class ChatClient extends JFrame {
 
-    private JTextArea chatArea;
     private JTextField messageField;
     private JTextField nameField;
     private JButton joinButton, sendButton, exitButton;
     private JList<String> userList;
     private DefaultListModel<String> userListModel;
-
+    private JLabel statusLabel;
     private Socket socket;
     private DataInputStream input;
     private DataOutputStream output;
-
+    private Map<String, Color> userColors = new HashMap<>();
     private String userName;
     private boolean joined = false;
 
+    
+    private JPanel chatContainer;
+
     public ChatClient() {
-        // ----- Frame setup -----
+
         setTitle("💬 Modern Chat App");
         setSize(750, 500);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -32,35 +41,29 @@ public class ChatClient extends JFrame {
         setLayout(new BorderLayout(10, 10));
         getContentPane().setBackground(new Color(25, 25, 25));
 
-        // ----- Title -----
-        JLabel titleLabel = new JLabel("💬 Anonymous Chat", SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
-        titleLabel.setForeground(new Color(0x00FF99));
-        titleLabel.setBorder(new EmptyBorder(10, 0, 10, 0));
-        add(titleLabel, BorderLayout.NORTH);
+        statusLabel = new JLabel("", SwingConstants.CENTER);
+        statusLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        statusLabel.setBorder(new EmptyBorder(6, 0, 6, 0));
+        statusLabel.setText("");
+        add(statusLabel, BorderLayout.BEFORE_FIRST_LINE);
 
-        // ----- Chat Panel -----
         JPanel chatPanel = new JPanel(new BorderLayout(10, 10));
         chatPanel.setBackground(new Color(30, 30, 30));
         chatPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        chatArea = new JTextArea();
-        chatArea.setEditable(false);
-        chatArea.setLineWrap(true);
-        chatArea.setWrapStyleWord(true);
-        chatArea.setBackground(new Color(40, 40, 40));
-        chatArea.setForeground(Color.WHITE);
-        chatArea.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        chatArea.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(0x00FF99), 1),
-                new EmptyBorder(8, 8, 8, 8)
-        ));
-        JScrollPane chatScroll = new JScrollPane(chatArea);
+        
+        chatContainer = new JPanel();
+        chatContainer.setLayout(new BoxLayout(chatContainer, BoxLayout.Y_AXIS));
+        chatContainer.setBackground(new Color(30, 30, 30));
+
+        JScrollPane chatScroll = new JScrollPane(chatContainer);
         chatScroll.setBorder(null);
+        chatScroll.getViewport().setOpaque(false);
+
         chatPanel.add(chatScroll, BorderLayout.CENTER);
+
         add(chatPanel, BorderLayout.CENTER);
 
-        // ----- Active Users Panel -----
         JPanel userPanel = new JPanel(new BorderLayout());
         userPanel.setBackground(new Color(35, 35, 35));
         userPanel.setPreferredSize(new Dimension(200, 0));
@@ -72,9 +75,10 @@ public class ChatClient extends JFrame {
 
         userListModel = new DefaultListModel<>();
         userList = new JList<>(userListModel);
-        userList.setBackground(new Color(45, 45, 45));
+
         userList.setForeground(Color.LIGHT_GRAY);
         userList.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+
         JScrollPane userScroll = new JScrollPane(userList);
         userScroll.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));
 
@@ -82,64 +86,65 @@ public class ChatClient extends JFrame {
         userPanel.add(userScroll, BorderLayout.CENTER);
         add(userPanel, BorderLayout.EAST);
 
-        // ----- Bottom Panel -----
         JPanel bottomPanel = new JPanel(new BorderLayout(10, 10));
         bottomPanel.setBackground(new Color(30, 30, 30));
         bottomPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
         messageField = new JTextField();
+        messageField.putClientProperty("JTextField.placeholderText", "Type message...");
         messageField.setBackground(new Color(50, 50, 50));
         messageField.setForeground(Color.WHITE);
         messageField.setCaretColor(Color.WHITE);
         messageField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        messageField.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(0x00FF99)),
-                new EmptyBorder(8, 8, 8, 8)
-        ));
+        messageField.setEnabled(false);
+
         bottomPanel.add(messageField, BorderLayout.CENTER);
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         buttonPanel.setBackground(new Color(30, 30, 30));
+
         sendButton = new JButton("Send");
-        exitButton = new JButton("Exit");
-        sendButton.setBackground(new Color(0x00FF99));
         sendButton.setForeground(Color.BLACK);
         sendButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        sendButton.setFocusPainted(false);
         sendButton.setEnabled(false);
 
-        exitButton.setBackground(new Color(255, 77, 77));
+        Color enabledColor = new Color(0x00FF99);
+        Color disabledColor = new Color(80, 80, 80);
+        sendButton.setBackground(disabledColor);
+
+        sendButton.addPropertyChangeListener("enabled", evt -> {
+            boolean en = (boolean) evt.getNewValue();
+            sendButton.setBackground(en ? enabledColor : disabledColor);
+        });
+
+        exitButton = new JButton("Exit");
         exitButton.setForeground(Color.WHITE);
         exitButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        exitButton.setFocusPainted(false);
 
         buttonPanel.add(sendButton);
         buttonPanel.add(exitButton);
         bottomPanel.add(buttonPanel, BorderLayout.EAST);
         add(bottomPanel, BorderLayout.SOUTH);
 
-        // ----- Name Input -----
         JPanel namePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         namePanel.setBackground(new Color(30, 30, 30));
         JLabel nameLabel = new JLabel("Your Name:");
         nameLabel.setForeground(Color.WHITE);
+
         nameField = new JTextField(10);
+        nameField.putClientProperty("JTextField.placeholderText", "Enter name...");
         nameField.setBackground(new Color(50, 50, 50));
         nameField.setForeground(Color.WHITE);
-        nameField.setCaretColor(Color.WHITE);
-        nameField.setBorder(BorderFactory.createLineBorder(new Color(0x00FF99)));
 
         joinButton = new JButton("Join");
         joinButton.setBackground(new Color(0x00FF99));
         joinButton.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        joinButton.setFocusPainted(false);
 
         namePanel.add(nameLabel);
         namePanel.add(nameField);
         namePanel.add(joinButton);
         chatPanel.add(namePanel, BorderLayout.NORTH);
 
-        // ----- Event Listeners -----
         joinButton.addActionListener(e -> joinChat());
         sendButton.addActionListener(e -> sendMessage());
         exitButton.addActionListener(e -> closeConnection());
@@ -160,10 +165,20 @@ public class ChatClient extends JFrame {
             socket = new Socket("localhost", 8000);
             input = new DataInputStream(socket.getInputStream());
             output = new DataOutputStream(socket.getOutputStream());
-            chatArea.append("🟢 Connected to server.\n");
+
+            SwingUtilities.invokeLater(() -> {
+                statusLabel.setText("🟢 Connected to server.");
+                statusLabel.setForeground(new Color(0x00CC00));
+            });
+
             new Thread(this::receiveMessages).start();
         } catch (IOException e) {
-            chatArea.append("🔴 Unable to connect to server.\n");
+            SwingUtilities.invokeLater(() -> {
+                statusLabel.setText("⏳ Waiting for server approval...");
+                statusLabel.setForeground(Color.RED);
+            });
+
+            appendMessage("🔴 Unable to connect to server.", Color.red);
         }
     }
 
@@ -179,9 +194,9 @@ public class ChatClient extends JFrame {
                 return;
             }
             output.writeUTF(userName);
-            chatArea.append("⏳ Waiting for server approval...\n");
+
         } catch (IOException e) {
-            chatArea.append("Error joining chat.\n");
+            appendMessage("Error joining chat.", Color.RED);
         }
     }
 
@@ -193,11 +208,11 @@ public class ChatClient extends JFrame {
             }
             String msg = messageField.getText().trim();
             if (!msg.isEmpty()) {
-                output.writeUTF("💬 " + userName + ": " + msg);
+                output.writeUTF(": " + msg);
                 messageField.setText("");
             }
         } catch (IOException e) {
-            chatArea.append("Error sending message.\n");
+            appendMessage("Error sending message.", Color.RED);
         }
     }
 
@@ -217,35 +232,167 @@ public class ChatClient extends JFrame {
                         }
                     });
                 } else if (msg.startsWith("Accepted")) {
+                    messageField.setEnabled(true);
                     joined = true;
                     SwingUtilities.invokeLater(() -> {
-                        chatArea.append("✅ Joined as " + userName + "\n");
+
+                        appendMessage("✅ Joined as " + userName, Color.CYAN);
                         sendButton.setEnabled(true);
                         joinButton.setEnabled(false);
                         nameField.setEditable(false);
                     });
+
                 } else if (msg.equals("Username already taken")) {
                     SwingUtilities.invokeLater(() ->
                             JOptionPane.showMessageDialog(this, "⚠️ Username already exists!"));
                 } else {
-                    SwingUtilities.invokeLater(() -> chatArea.append(msg + "\n"));
+
+                    SwingUtilities.invokeLater(() -> {
+                        boolean mine = userName != null && extractName(msg).equals(userName);
+                        Color c = mine ? new Color(0x00FF99) : getUserColor(extractName(msg));
+                        appendMessage(msg, c);
+                    });
                 }
             }
         } catch (IOException e) {
-            chatArea.append("⚠️ Connection closed.\n");
+            appendMessage("⚠️ Connection closed.", Color.WHITE);
         }
+    }
+
+    private void appendMessage(String text, Color textColor) {
+
+        boolean mine = userName != null && text.startsWith(userName + ":");
+        boolean system = !text.contains(":");
+
+       
+        if (system) {
+
+            JPanel wrapper = new JPanel();
+            wrapper.setLayout(new BoxLayout(wrapper, BoxLayout.X_AXIS));
+            wrapper.setOpaque(false);
+
+            JLabel lbl = new JLabel(text);
+            lbl.setForeground(textColor);
+            lbl.setFont(new Font("Segoe UI", Font.BOLD, 12));
+
+            wrapper.add(Box.createHorizontalGlue());
+            wrapper.add(lbl);
+            wrapper.add(Box.createHorizontalGlue());
+
+            chatContainer.add(wrapper);
+            scrollDown();
+            return;
+        }
+
+       
+        JPanel wrapper = new JPanel(new FlowLayout(mine ? FlowLayout.LEFT : FlowLayout.RIGHT));
+        wrapper.setOpaque(false);
+
+        String time = new SimpleDateFormat("HH:mm").format(new Date());
+        ChatBubble bubble = new ChatBubble(text, time, mine, textColor, false);
+
+        wrapper.add(bubble);
+        chatContainer.add(wrapper);
+
+        scrollDown();
+    }
+
+    private void scrollDown() {
+        chatContainer.revalidate();
+        chatContainer.repaint();
+        JScrollBar sb = ((JScrollPane) chatContainer.getParent().getParent()).getVerticalScrollBar();
+        sb.setValue(sb.getMaximum());
     }
 
     private void closeConnection() {
         try {
             if (socket != null) socket.close();
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
         dispose();
         System.exit(0);
     }
 
+    private Color getUserColor(String name) {
+        return userColors.computeIfAbsent(name, n -> {
+            Random r = new Random(n.hashCode());
+            return new Color(100 + r.nextInt(155), 100 + r.nextInt(155), 100 + r.nextInt(155));
+        });
+    }
+
+    private String extractName(String msg) {
+        int sp = msg.indexOf(":");
+        if (sp != -1)
+            return msg.substring(0, sp).trim();
+        return "unknown";
+    }
+
     public static void main(String[] args) {
+        try {
+            FlatAnimatedLafChange.showSnapshot();
+            FlatDarkLaf.setup();
+            UIManager.put("Button.arc", 20);
+            UIManager.put("TextComponent.arc", 15);
+            UIManager.put("Component.focusWidth", 1);
+            UIManager.put("defaultFont", new Font("Segoe UI", Font.PLAIN, 14));
+            FlatAnimatedLafChange.hideSnapshotWithAnimation();
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+
         SwingUtilities.invokeLater(ChatClient::new);
     }
 }
 
+
+class ChatBubble extends JPanel {
+
+    private final String text;
+    private final String time;
+    private final boolean mine;
+    private final boolean sys;
+    private final Color textColor;
+
+    ChatBubble(String text, String time, boolean mine, Color textColor, boolean sys) {
+        this.text = text;
+        this.time = time;
+        this.mine = mine;
+        this.textColor = textColor;
+        this.sys = sys;
+
+        setOpaque(false);
+        setLayout(new BorderLayout());
+
+        JLabel label = new JLabel("<html>" + text + "</html>");
+        label.setForeground(textColor);
+        label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+
+        add(label, BorderLayout.CENTER);
+
+        if (!sys) {
+            JLabel t = new JLabel(time);
+            t.setForeground(Color.LIGHT_GRAY);
+            t.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+            add(t, BorderLayout.SOUTH);
+        }
+
+        setBorder(new EmptyBorder(8, 12, 8, 12));
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+
+        Graphics2D g2 = (Graphics2D) g;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        Color bubble = sys
+                ? new Color(90, 90, 90, 140)
+                : (mine ? new Color(0, 150, 90, 180) : new Color(70, 70, 70, 180));
+
+        g2.setColor(bubble);
+        g2.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
+
+        super.paintComponent(g);
+    }
+}
