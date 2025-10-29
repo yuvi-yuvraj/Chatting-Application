@@ -79,7 +79,7 @@ public class ChatServer {
                                 userList.add(userName);
                                 dout.writeUTF("Accepted");
                                 userJoined = true;
-                                sendToAll("SYS:" + userName + " joined the chat.");
+                                sendToAll("🔴 " + userName + " joined the chat.");
                                 server.dispatchUserList();
                                 System.out.println("👤 " + userName + " joined.");
                             }
